@@ -1,2 +1,3 @@
 [workspace]
-members = ["deku", "deku-derive", "deku-ensure-wasm", "deku-ensure-no-std"]
+members  = ["deku", "deku-derive", "deku-ensure-wasm", "deku-ensure-no-std"]
+resolver = "2"
