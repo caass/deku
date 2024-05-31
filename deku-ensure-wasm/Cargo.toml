@@ -1,10 +1,8 @@
 [package]
-name = "ensure_wasm"
+name = "deku-ensure-wasm"
 version = "0.1.0"
 authors = ["sharks <sharks@sharks>"]
 edition = "2018"
-
-[workspace]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -28,7 +26,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 # Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
 wee_alloc = { version = "0.4", optional = true }
 
-deku = { path = "../" }
+deku = { path = "../deku" }
 hex = "0.4"
 
 [dev-dependencies]

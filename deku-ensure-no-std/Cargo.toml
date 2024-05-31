@@ -1,5 +1,5 @@
 [package]
-name = "ensure_no_std"
+name = "deku-ensure-no-std"
 version = "0.1.0"
 authors = ["sharks <sharks@sharks>"]
 edition = "2018"
@@ -11,8 +11,6 @@ panic = "abort"
 panic = "abort"
 lto = true
 
-[workspace]
-
 
 [features]
 default = ["alloc"]
@@ -20,6 +18,6 @@ alloc = []
 
 [dependencies]
 cortex-m-rt = "0.7.3"
-deku = { path = "../", default-features = false, features = ["alloc"] }
+deku = { path = "../deku", default-features = false, features = ["alloc"] }
 embedded-alloc = "0.5.1"
 
