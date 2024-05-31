@@ -1,3 +1,6 @@
 [workspace]
-members  = ["deku", "deku-derive", "deku-ensure-wasm", "deku-ensure-no-std"]
+members  = ["deku", "deku-derive"]
 resolver = "2"
+
+[workspace.dependencies]
+rstest = "0.20"
