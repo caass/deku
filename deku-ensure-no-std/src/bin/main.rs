@@ -60,7 +60,7 @@ fn main() -> ! {
     loop { /* .. */ }
 }
 
-#[panic_handler]
+#[cfg_attr(no_std, panic_handler)]
 fn panic(_: &PanicInfo) -> ! {
     loop {}
 }
