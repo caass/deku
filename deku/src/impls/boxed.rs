@@ -75,13 +75,9 @@ mod tests {
     use crate::native_endian;
     use crate::reader::Reader;
 
-    #[rstest(input, expected,
-        case(
-            &[0xEF, 0xBE],
-            Box::new(native_endian!(0xBEEF_u16)),
-        ),
-    )]
-    fn test_boxed(input: &[u8], expected: Box<u16>) {
+    #[rstest]
+    #[case(&[0xEF, 0xBE], Box::new(native_endian!(0xBEEF_u16)))]
+    fn test_boxed(#[case] input: &[u8], #[case] expected: Box<u16>) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = <Box<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
