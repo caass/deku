@@ -302,37 +302,37 @@ mod tests {
     #[case::no_data_bit_size_too_big(
         [],
         Ctx::little_endian().with_bit_size(9).with_limit(1),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
     #[case::bit_size_too_big(
         [0xAA],
         Ctx::little_endian().with_bit_size(9).with_limit(1),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     #[case::not_enough_data(
         [0xAA],
         Ctx::little_endian().with_bit_size(8).with_limit(2),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     #[case::not_enough_data_until(
         [0xAA],
         Ctx::little_endian().with_bit_size(8).with_limit(|_: &(u8, u8)| false),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     #[case::not_enough_data_bits(
         [0xAA],
         Ctx::little_endian().with_bit_size(8).with_limit(BitSize(16)),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
     #[case::too_much_data(
         [0xAA, 0xBB],
         Ctx::little_endian().with_bit_size(9).with_limit(1),
-        ReadOutput::expected(FxHashMap::default())
+        ReadOutput::should_panic()
     )]
     fn test_hashmap_read(
         #[case] input: impl AsRef<[u8]>,

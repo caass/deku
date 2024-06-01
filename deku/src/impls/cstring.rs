@@ -52,7 +52,7 @@ mod tests {
         ReadOutput::expected(CString::new("test").unwrap()).with_rest_bytes(&[b'a'])
     )]
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-    #[case([b't', b'e', b's', b't'], ReadOutput::expected(CString::new("test").unwrap()))]
+    #[case([b't', b'e', b's', b't'], ReadOutput::should_panic())]
     fn test_cstring(#[case] input: impl AsRef<[u8]>, #[case] expected: ReadOutput<CString>) {
         let input = input.as_ref();
         let mut cursor = Cursor::new(input);

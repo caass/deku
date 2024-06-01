@@ -92,6 +92,22 @@ mod test_common {
         pub(super) rest_bytes: &'a [u8],
     }
 
+    impl<'a, T: Default> Default for ReadOutput<'a, T> {
+        fn default() -> Self {
+            Self {
+                value: T::default(),
+                rest_bits: DEFAULT_REST_BITS.as_bitslice(),
+                rest_bytes: DEFAULT_REST_BYTES,
+            }
+        }
+    }
+
+    impl<'a, T: Default> ReadOutput<'a, T> {
+        pub(super) fn should_panic() -> Self {
+            Self::default()
+        }
+    }
+
     impl<'a, T> ReadOutput<'a, T> {
         pub(super) fn expected(value: T) -> Self {
             Self {
