@@ -32,7 +32,7 @@ mod test_common {
 
     use crate::ctx::{Endian, Limit};
 
-    pub(super) struct Options<T, Predicate>
+    pub(super) struct Ctx<T, Predicate>
     where
         Predicate: FnMut(&T) -> bool,
     {
@@ -41,23 +41,21 @@ mod test_common {
         pub(super) limit: Limit<T, Predicate>,
     }
 
-    impl<T, Predicate> Options<T, Predicate>
+    impl<T, Predicate> Ctx<T, Predicate>
     where
         Predicate: FnMut(&T) -> bool,
     {
         pub(super) fn little_endian() -> Self {
             Self {
                 endian: Endian::Little,
-                bit_size: None,
-                limit: Limit::End,
+                ..Default::default()
             }
         }
 
         pub(super) fn big_endian() -> Self {
             Self {
                 endian: Endian::Big,
-                bit_size: None,
-                limit: Limit::End,
+                ..Default::default()
             }
         }
 
@@ -69,6 +67,19 @@ mod test_common {
         pub(super) fn with_limit(mut self, limit: impl Into<Limit<T, Predicate>>) -> Self {
             self.limit = limit.into();
             self
+        }
+    }
+
+    impl<T, Predicate> Default for Ctx<T, Predicate>
+    where
+        Predicate: FnMut(&T) -> bool,
+    {
+        fn default() -> Self {
+            Self {
+                endian: Endian::default(),
+                bit_size: None,
+                limit: Limit::End,
+            }
         }
     }
 
