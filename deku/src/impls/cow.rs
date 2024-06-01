@@ -39,13 +39,10 @@ mod tests {
     use super::*;
     use crate::{native_endian, reader::Reader};
 
-    #[rstest(input, expected,
-        case(
-            &[0xEF, 0xBE],
-            Cow::Owned(native_endian!(0xBEEF_u16)),
-        ),
-    )]
-    fn test_cow(input: &[u8], expected: Cow<u16>) {
+    #[rstest]
+    #[case([0xEF, 0xBE], Cow::Owned(native_endian!(0xBEEF_u16)))]
+    fn test_cow(#[case] input: impl AsRef<[u8]>, #[case] expected: Cow<u16>) {
+        let input = input.as_ref();
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();

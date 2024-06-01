@@ -41,33 +41,27 @@ mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
-    use crate::reader::Reader;
+    use crate::{impls::test_common::ReadOutput, reader::Reader};
 
     use super::*;
 
-    #[rstest(input, expected, expected_rest,
-        case(
-            &[b't', b'e', b's', b't', b'\0'],
-            CString::new("test").unwrap(),
-            &[],
-        ),
-        case(
-            &[b't', b'e', b's', b't', b'\0', b'a'],
-            CString::new("test").unwrap(),
-            &[b'a'],
-        ),
-
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), &[]),
+    #[rstest]
+    #[case([b't', b'e', b's', b't', b'\0'], ReadOutput::expected(CString::new("test").unwrap()))]
+    #[case(
+        [b't', b'e', b's', b't', b'\0', b'a'],
+        ReadOutput::expected(CString::new("test").unwrap()).with_rest_bytes(&[b'a'])
     )]
-    fn test_cstring(input: &[u8], expected: CString, expected_rest: &[u8]) {
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+    #[case([b't', b'e', b's', b't'], ReadOutput::expected(CString::new("test").unwrap()))]
+    fn test_cstring(#[case] input: impl AsRef<[u8]>, #[case] expected: ReadOutput<CString>) {
+        let input = input.as_ref();
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = CString::from_reader_with_ctx(&mut reader, ()).unwrap();
-        assert_eq!(expected, res_read);
+        assert_eq!(expected.value, res_read);
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();
-        assert_eq!(expected_rest, buf);
+        assert_eq!(expected.rest_bytes, buf);
 
         let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();

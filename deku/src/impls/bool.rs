@@ -51,21 +51,21 @@ mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
+    use crate::impls::test_common::*;
     use crate::{ctx::BitSize, reader::Reader};
 
     use super::*;
 
-    #[rstest(input, expected,
-        case(&hex!("00"), false),
-        case(&hex!("01"), true),
-
-        #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
-        case(&hex!("02"), false),
-    )]
-    fn test_bool(mut input: &[u8], expected: bool) {
+    #[rstest]
+    #[case::zero(hex!("00"), ReadOutput::expected(false))]
+    #[case::one(hex!("01"), ReadOutput::expected(true))]
+    #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
+    #[case::two(hex!("02"), ReadOutput::expected(false))]
+    fn test_bool(#[case] input: impl AsRef<[u8]>, #[case] expected: ReadOutput<bool>) {
+        let mut input = input.as_ref();
         let mut reader = Reader::new(&mut input);
         let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();
-        assert_eq!(expected, res_read);
+        assert_eq!(expected.value, res_read);
     }
 
     #[test]
