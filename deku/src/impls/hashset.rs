@@ -204,67 +204,137 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::bitvec::{bits, BitSlice, Msb0};
+    use crate::bitvec::{bitarr, Msb0};
     use no_std_io::io::Cursor;
     use rstest::rstest;
-    use rustc_hash::FxHashSet;
+
+    // Note: due to https://github.com/rust-lang/rust/blob/a94483a5f2bae907bc898fc7a8d9cc87db47b693/library/std/src/collections/hash/set.rs#L1039-L1050
+    // we use the regular hash set as it's more convenient. It should only slow us down a little in testing.
+    use std::collections::HashSet as FxHashSet;
 
     use crate::reader::Reader;
+    use crate::impls::test_common::*;
 
     use super::*;
 
-    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
-        case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashSet::default(), bits![u8, Msb0;], &[0xaa]),
-        case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[0xcc]),
-        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_empty_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_empty_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
-        case::until_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(1).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_count([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110].into_iter().collect(), bits![u8, Msb0; 1, 0, 0, 1], &[]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case::not_enough_data_until([0xAA].as_ref(), Endian::Little, Some(8), (|_: &u8| false).into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case::not_enough_data_bits([0xAA].as_ref(), Endian::Little, Some(8), (BitSize(16)).into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
+    #[rstest]
+    #[case::count_0(
+        [0xAA],
+        Ctx::little_endian().with_bit_size(8).with_limit(0),
+        ReadOutput::expected([]).with_rest_bytes(&[0xaa])
     )]
-    fn test_hashset_read<Predicate: FnMut(&u8) -> bool + Copy>(
-        input: &[u8],
-        endian: Endian,
-        bit_size: Option<usize>,
-        limit: Limit<u8, Predicate>,
-        expected: FxHashSet<u8>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
-        expected_rest_bytes: &[u8],
+    #[case::count_1(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_bit_size(8).with_limit(1),
+        ReadOutput::expected([0xAA]).with_rest_bytes(&[0xbb])
+    )]
+    #[case::count_2(
+        [0xAA, 0xBB, 0xCC],
+        Ctx::little_endian().with_bit_size(8).with_limit(2),
+        ReadOutput::expected([0xAA, 0xBB]).with_rest_bytes(&[0xcc])
+    )]
+    #[case::until_null(
+        [0xAA, 0, 0xBB],
+        Ctx::little_endian().with_limit(|v: &u8| *v == 0u8),
+        ReadOutput::expected([0xAA, 0]).with_rest_bytes(&[0xbb])
+    )]
+    #[case::until_empty_bits(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_limit(BitSize(0)),
+        ReadOutput::expected([]).with_rest_bytes(&[0xaa, 0xbb])
+    )]
+    #[case::until_empty_bytes(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_limit(ByteSize(0)),
+        ReadOutput::expected([]).with_rest_bytes(&[0xaa, 0xbb])
+    )]
+    #[case::until_bits(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_limit(BitSize(8)),
+        ReadOutput::expected([0xAA]).with_rest_bytes(&[0xbb])
+    )]
+    #[case::read_all(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_limit(Limit::end()),
+        ReadOutput::expected([0xAA, 0xBB])
+    )]
+    #[case::until_bytes(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_limit(ByteSize(1)),
+        ReadOutput::expected([0xAA]).with_rest_bytes(&[0xbb])
+    )]
+    #[case::until_count(
+        [0xAA, 0xBB], 
+        Ctx::little_endian().with_limit(1),
+        ReadOutput::expected([0xAA]).with_rest_bytes(&[0xbb])
+    )]
+    #[case::bits_6(
+        [0b0110_1001, 0b1110_1001],
+        Ctx::little_endian().with_bit_size(6).with_limit(2),
+        ReadOutput::expected([0b00_011010, 0b00_011110]).with_rest_bits(bitarr![u8, Msb0; 1, 0, 0, 1])
+    )]
+    #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+    #[case::not_enough_data(
+        [],
+        Ctx::little_endian().with_bit_size(9).with_limit(1),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+    #[case::not_enough_data(
+        [0xAA],
+        Ctx::little_endian().with_bit_size(9).with_limit(1),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+    #[case::not_enough_data(
+        [0xAA],
+        Ctx::little_endian().with_bit_size(8).with_limit(2),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+    #[case::not_enough_data_until(
+        [0xAA],
+        Ctx::little_endian().with_bit_size(8).with_limit(|_: &u8| false),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+    #[case::not_enough_data_bits(
+        [0xAA],
+        Ctx::little_endian().with_bit_size(8).with_limit(BitSize(16)),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+    #[case::too_much_data(
+        [0xAA, 0xBB],
+        Ctx::little_endian().with_bit_size(9).with_limit(1),
+        ReadOutput::should_panic()
+    )]
+    fn test_hashset_read<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] ctx: Ctx<u8, impl FnMut(&u8) -> bool + Copy>,
+        #[case] expected: ReadOutput<BITS, FxHashSet<u8>>,
     ) {
+        let input = input.as_ref();
+
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
+
+        let res_read = match ctx.bit_size {
             Some(bit_size) => FxHashSet::<u8>::from_reader_with_ctx(
                 &mut reader,
-                (limit, (endian, BitSize(bit_size))),
+                (ctx.limit, (ctx.endian, BitSize(bit_size))),
             )
             .unwrap(),
-            None => FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
+            None => FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (ctx.limit, (ctx.endian))).unwrap(),
         };
-        assert_eq!(expected, res_read);
+        assert_eq!(expected.value, res_read);
         assert_eq!(
             reader.rest(),
-            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+            expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();
-        assert_eq!(expected_rest_bytes, buf);
+        assert_eq!(expected.rest_bytes, buf);
     }
 
     #[rstest(input, endian, expected,
@@ -277,46 +347,73 @@ mod tests {
     }
 
     // Note: These tests also exist in boxed.rs
-    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
-        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC].into_iter().collect(), bits![u8, Msb0;], &[], vec![0xCC, 0xDD, 0xAA, 0xBB]),
-        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_iter().collect(), bits![u8, Msb0;], &[], vec![0xCC, 0xDD, 0xAA, 0xBB]),
-        case::predicate_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), (|v: &u16| *v == 0xBBAA).into(), vec![0xBBAA].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
-        case::predicate_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), (|v: &u16| *v == 0xAABB).into(), vec![0xAABB].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
-        case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), BitSize(16).into(), vec![0xBBAA].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
-        case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), BitSize(16).into(), vec![0xAABB].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
+    #[rstest]
+    #[case::normal_le(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::little_endian().with_bit_size(16).with_limit(2),
+        ReadOutput::expected([0xBBAA, 0xDDCC]),
+        WriteOutput::expected([0xCC, 0xDD, 0xAA, 0xBB])
     )]
-    fn test_hashset_read_write<Predicate: FnMut(&u16) -> bool + Copy>(
-        input: &[u8],
-        endian: Endian,
-        bit_size: Option<usize>,
-        limit: Limit<u16, Predicate>,
-        expected: FxHashSet<u16>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
-        expected_rest_bytes: &[u8],
-        expected_write: Vec<u8>,
+    #[case::normal_be(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::big_endian().with_bit_size(16).with_limit(2),
+        ReadOutput::expected([0xAABB, 0xCCDD]),
+        WriteOutput::expected([0xCC, 0xDD, 0xAA, 0xBB])
+    )]
+    #[case::predicate_le(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::little_endian().with_bit_size(16).with_limit(|v: &u16| *v == 0xBBAA),
+        ReadOutput::expected([0xBBAA]).with_rest_bytes(&[0xcc, 0xdd]),
+        WriteOutput::expected([0xAA, 0xBB])
+    )]
+    #[case::predicate_be(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::big_endian().with_bit_size(16).with_limit(|v: &u16| *v == 0xAABB),
+        ReadOutput::expected([0xAABB]).with_rest_bytes(&[0xcc, 0xdd]),
+        WriteOutput::expected([0xAA, 0xBB])
+    )]
+    #[case::bytes_le(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::little_endian().with_bit_size(16).with_limit(BitSize(16)),
+        ReadOutput::expected([0xBBAA]).with_rest_bytes(&[0xcc, 0xdd]),
+        WriteOutput::expected([0xAA, 0xBB])
+    )]
+    #[case::bytes_be(
+        [0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::big_endian().with_bit_size(16).with_limit(BitSize(16)),
+        ReadOutput::expected([0xAABB]).with_rest_bytes(&[0xcc, 0xdd]),
+        WriteOutput::expected(vec![0xAA, 0xBB])
+    )]
+    fn test_hashset_read_write<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] ctx: Ctx<u16, impl FnMut(&u16) -> bool + Copy>,
+        #[case] expected: ReadOutput<BITS, FxHashSet<u16>>,
+        #[case] expected_write: WriteOutput
     ) {
+        let input = input.as_ref();
+
         // Unwrap here because all test cases are `Some`.
-        let bit_size = bit_size.unwrap();
+        let bit_size = ctx.bit_size.unwrap();
 
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = FxHashSet::<u16>::from_reader_with_ctx(
             &mut reader,
-            (limit, (endian, BitSize(bit_size))),
+            (ctx.limit, (ctx.endian, BitSize(bit_size))),
         )
         .unwrap();
-        assert_eq!(expected, res_read);
+        assert_eq!(expected.value, res_read);
         assert_eq!(
             reader.rest(),
-            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+            expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();
-        assert_eq!(expected_rest_bytes, buf);
+        assert_eq!(expected.rest_bytes, buf);
 
         let mut writer = Writer::new(vec![]);
         res_read
-            .to_writer(&mut writer, (endian, BitSize(bit_size)))
+            .to_writer(&mut writer, (ctx.endian, BitSize(bit_size)))
             .unwrap();
         assert_eq!(expected_write, writer.inner);
     }

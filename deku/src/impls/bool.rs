@@ -61,7 +61,10 @@ mod tests {
     #[case::one(hex!("01"), ReadOutput::expected(true))]
     #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
     #[case::two(hex!("02"), ReadOutput::should_panic())]
-    fn test_bool(#[case] input: impl AsRef<[u8]>, #[case] expected: ReadOutput<bool>) {
+    fn test_bool<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] expected: ReadOutput<BITS, bool>,
+    ) {
         let mut input = input.as_ref();
         let mut reader = Reader::new(&mut input);
         let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();

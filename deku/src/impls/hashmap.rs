@@ -246,7 +246,7 @@ mod tests {
     #[case::count_0(
         [0xAA],
         Ctx::little_endian().with_bit_size(8).with_limit(0),
-        ReadOutput::expected(FxHashMap::default()).with_rest_bytes(&[0xaa])
+        ReadOutput::default().with_rest_bytes(&[0xaa])
     )]
     #[case::count_1(
         [0x01, 0xAA, 0x02, 0xBB],
@@ -266,12 +266,12 @@ mod tests {
     #[case::until_empty_bits(
         [0x01, 0xAA, 0xBB],
         Ctx::little_endian().with_limit(BitSize(0)),
-        ReadOutput::expected(FxHashMap::default()).with_rest_bytes(&[0x01, 0xaa, 0xbb])
+        ReadOutput::default().with_rest_bytes(&[0x01, 0xaa, 0xbb])
     )]
     #[case::until_empty_bytes(
         [0x01, 0xAA, 0xBB],
         Ctx::little_endian().with_limit(ByteSize(0)),
-        ReadOutput::expected(FxHashMap::default()).with_rest_bytes(&[0x01, 0xaa, 0xbb])
+        ReadOutput::default().with_rest_bytes(&[0x01, 0xaa, 0xbb])
     )]
     #[case::until_bits(
         [0x01, 0xAA, 0xBB],
@@ -334,10 +334,10 @@ mod tests {
         Ctx::little_endian().with_bit_size(9).with_limit(1),
         ReadOutput::should_panic()
     )]
-    fn test_hashmap_read(
+    fn test_hashmap_read<const BITS: usize>(
         #[case] input: impl AsRef<[u8]>,
         #[case] ctx: Ctx<(u8, u8), impl FnMut(&(u8, u8)) -> bool + Copy>,
-        #[case] expected: ReadOutput<FxHashMap<u8, u8>>,
+        #[case] expected: ReadOutput<BITS, FxHashMap<u8, u8>>,
     ) {
         let input = input.as_ref();
 

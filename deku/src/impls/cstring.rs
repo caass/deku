@@ -53,7 +53,10 @@ mod tests {
     )]
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     #[case([b't', b'e', b's', b't'], ReadOutput::should_panic())]
-    fn test_cstring(#[case] input: impl AsRef<[u8]>, #[case] expected: ReadOutput<CString>) {
+    fn test_cstring<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] expected: ReadOutput<BITS, CString>,
+    ) {
         let input = input.as_ref();
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);

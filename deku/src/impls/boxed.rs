@@ -126,10 +126,10 @@ mod tests {
         ReadOutput::expected(vec![0xAABB].into_boxed_slice()).with_rest_bytes(&[0xcc, 0xdd]),
         vec![0xAA, 0xBB]
     )]
-    fn test_boxed_slice_from_reader_with_ctx(
+    fn test_boxed_slice_from_reader_with_ctx<const BITS: usize>(
         #[case] input: impl AsRef<[u8]>,
         #[case] ctx: Ctx<u16, impl FnMut(&u16) -> bool>,
-        #[case] expected: ReadOutput<Box<[u16]>>,
+        #[case] expected: ReadOutput<BITS, Box<[u16]>>,
         #[case] expected_write: Vec<u8>,
     ) {
         let input = input.as_ref();

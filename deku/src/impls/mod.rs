@@ -27,8 +27,7 @@ mod boxed;
 
 #[cfg(test)]
 mod test_common {
-    use bitvec::{array::BitArray, bitarr, prelude::Msb0, slice::BitSlice};
-    use once_cell::sync::Lazy;
+    use bitvec::prelude::{bitarr, BitArray, Msb0};
 
     use crate::ctx::{Endian, Limit};
 
@@ -84,47 +83,77 @@ mod test_common {
     }
 
     static DEFAULT_REST_BYTES: &[u8] = &[];
-    static DEFAULT_REST_BITS: Lazy<BitArray<[u8; 0], Msb0>> = Lazy::new(|| bitarr![u8, Msb0;]);
 
-    pub(super) struct ReadOutput<'a, T> {
+    pub(super) struct ReadOutput<'a, const BITS: usize, T> {
         pub(super) value: T,
-        pub(super) rest_bits: &'a BitSlice<u8, Msb0>,
+        pub(super) rest_bits: BitArray<[u8; BITS], Msb0>,
         pub(super) rest_bytes: &'a [u8],
     }
 
-    impl<'a, T: Default> Default for ReadOutput<'a, T> {
+    impl<'a, T: Default> Default for ReadOutput<'a, 0, T> {
         fn default() -> Self {
             Self {
                 value: T::default(),
-                rest_bits: DEFAULT_REST_BITS.as_bitslice(),
+                rest_bits: bitarr![u8, Msb0;],
                 rest_bytes: DEFAULT_REST_BYTES,
             }
         }
     }
 
-    impl<'a, T: Default> ReadOutput<'a, T> {
+    impl<'a, T: Default> ReadOutput<'a, 0, T> {
         pub(super) fn should_panic() -> Self {
             Self::default()
         }
     }
 
-    impl<'a, T> ReadOutput<'a, T> {
-        pub(super) fn expected(value: T) -> Self {
+    impl<'a, T> ReadOutput<'a, 0, T> {
+        pub(super) fn expected(value: impl Into<T>) -> Self {
             Self {
-                value,
-                rest_bits: DEFAULT_REST_BITS.as_bitslice(),
+                value: value.into(),
+                rest_bits: bitarr![u8, Msb0;],
                 rest_bytes: DEFAULT_REST_BYTES,
             }
         }
 
-        pub(super) fn with_rest_bits(mut self, rest_bits: &'a BitSlice<u8, Msb0>) -> Self {
-            self.rest_bits = rest_bits;
-            self
+        pub(super) fn with_rest_bits<const BITS: usize>(
+            self,
+            rest_bits: BitArray<[u8; BITS], Msb0>,
+        ) -> ReadOutput<'a, BITS, T> {
+            ReadOutput {
+                value: self.value,
+                rest_bits,
+                rest_bytes: self.rest_bytes,
+            }
         }
+    }
 
+    impl<'a, const BITS: usize, T> ReadOutput<'a, BITS, T> {
         pub(super) fn with_rest_bytes(mut self, rest_bytes: &'a [u8]) -> Self {
             self.rest_bytes = rest_bytes;
             self
+        }
+    }
+
+    #[derive(Default, Debug)]
+    pub(super) struct WriteOutput(pub Vec<u8>);
+
+    impl WriteOutput {
+        pub(super) fn should_panic() -> Self {
+            Self::default()
+        }
+
+        pub(super) fn empty() -> Self {
+            Self::default()
+        }
+
+        pub(super) fn expected(expected: impl Into<Vec<u8>>) -> Self {
+            Self(expected.into())
+        }
+    }
+
+    impl PartialEq<Vec<u8>> for WriteOutput {
+        fn eq(&self, other: &Vec<u8>) -> bool {
+            self.0.eq(other)
         }
     }
 }
