@@ -600,7 +600,11 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::{native_endian, reader::Reader};
+    use crate::{
+        impls::test_common::{Ctx, ReadOutput},
+        native_endian,
+        reader::Reader,
+    };
 
     static ENDIAN: Endian = Endian::new();
 
@@ -704,45 +708,62 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
-    #[rstest(input, endian, bit_size, expected, expected_rest_bits, expected_rest_bytes,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], &[]),
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(32), 0xDDCC_BBAA, bits![u8, Msb0;], &[]),
-        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![u8, Msb0; 0, 0, 0, 0], &[0xcc, 0xdd]),
-        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![u8, Msb0; 0, 0, 0, 0], &[0xcc, 0xdd]),
-        case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![u8, Msb0; 1, 0,], &[]),
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")] // This will end up in ByteSize b/c 64 % 8 == 0
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![u8, Msb0;], &[]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 63 bits\")")] // This will end up staying BitSize
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(63), 0xFF, bits![u8, Msb0;], &[]),
+    #[rstest]
+    #[case::normal_le([0xDD, 0xCC, 0xBB, 0xAA], Ctx::little_endian().with_bit_size(32), ReadOutput::expected(0xAABB_CCDDu32))]
+    #[case::normal_be([0xDD, 0xCC, 0xBB, 0xAA], Ctx::big_endian().with_bit_size(32), ReadOutput::expected(0xDDCC_BBAAu32))]
+    #[case::normal_bits_12_le(
+        [0b1001_0110, 0b1110_0000, 0xCC, 0xDD ],
+        Ctx::little_endian().with_bit_size(12),
+        ReadOutput::expected(0b1110_1001_0110u32).with_rest_bits(bitarr![u8, Msb0; 0, 0, 0, 0]).with_rest_bytes(&[0xcc, 0xdd])
     )]
-    fn test_bit_read(
-        mut input: &[u8],
-        endian: Endian,
-        bit_size: Option<usize>,
-        expected: u32,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
-        expected_rest_bytes: &[u8],
+    #[case::normal_bits_12_be(
+        [0b1001_0110, 0b1110_0000, 0xCC, 0xDD],
+        Ctx::big_endian().with_bit_size(12),
+        ReadOutput::expected(0b1001_0110_1110u32).with_rest_bits(bitarr![u8, Msb0; 0, 0, 0, 0]).with_rest_bytes(&[0xcc, 0xdd])
+    )]
+    #[case::normal_bit_6(
+        [0b1001_0110],
+        Ctx::little_endian().with_bit_size(6),
+        ReadOutput::expected(0b1001_01u32).with_rest_bits(bitarr![u8, Msb0; 1, 0,])
+    )]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
+    #[case::not_enough_data([], Ctx::little_endian().with_bit_size(32), ReadOutput::should_panic())]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
+    #[case::not_enough_data([0xAA, 0xBB], Ctx::little_endian().with_bit_size(32), ReadOutput::should_panic())]
+    #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")] // This will end up in ByteSize b/c 64 % 8 == ]
+    #[case::too_much_data(
+        [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::little_endian().with_bit_size(64),
+        ReadOutput::should_panic()
+    )]
+    #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 63 bits\")")] // This will end up staying BitSiz]
+    #[case::too_much_data(
+        [0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD],
+        Ctx::little_endian().with_bit_size(63),
+        ReadOutput::should_panic()
+    )]
+    fn test_bit_read<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] ctx: Ctx<u32>,
+        #[case] expected: ReadOutput<BITS, u32>,
     ) {
         // test both Read &[u8] and Read BitVec
+        let mut input = input.as_ref();
         let mut reader = Reader::new(&mut input);
-        let res_read = match bit_size {
+        let res_read = match ctx.bit_size {
             Some(bit_size) => {
-                u32::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size))).unwrap()
+                u32::from_reader_with_ctx(&mut reader, (ctx.endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader_with_ctx(&mut reader, endian).unwrap(),
+            None => u32::from_reader_with_ctx(&mut reader, ctx.endian).unwrap(),
         };
-        assert_eq!(expected, res_read);
+        assert_eq!(*expected.value(), res_read);
         assert_eq!(
             reader.rest(),
-            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+            expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
         input.read_to_end(&mut buf).unwrap();
-        assert_eq!(expected_rest_bytes, buf);
+        assert_eq!(expected.rest_bytes, buf);
     }
 
     #[rstest(input, endian, byte_size, expected, expected_rest_bytes,
@@ -818,8 +839,8 @@ mod tests {
     #[rstest(input, endian, byte_size, expected,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
-        case::byte_size_le_smaller(0x00ffABAA, Endian::Little, Some(2), vec![0xaa, 0xab]),
-        case::byte_size_be_smaller(0x00ffABAA, Endian::Big, Some(2), vec![0xab, 0xaa]),
+        case::byte_size_le_smaller(0x00FFABAA, Endian::Little, Some(2), vec![0xaa, 0xab]),
+        case::byte_size_be_smaller(0x00FFABAA, Endian::Big, Some(2), vec![0xab, 0xaa]),
         #[should_panic(expected = "InvalidParam(\"byte size 10 is larger then input 4\")")]
         case::byte_size_le_bigger(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
     )]

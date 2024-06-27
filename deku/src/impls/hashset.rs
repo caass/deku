@@ -327,7 +327,7 @@ mod tests {
             .unwrap(),
             None => FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (ctx.limit, (ctx.endian))).unwrap(),
         };
-        assert_eq!(expected.value, res_read);
+        assert_eq!(*expected.value(), res_read);
         assert_eq!(
             reader.rest(),
             expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()
@@ -402,7 +402,7 @@ mod tests {
             (ctx.limit, (ctx.endian, BitSize(bit_size))),
         )
         .unwrap();
-        assert_eq!(expected.value, res_read);
+        assert_eq!(*expected.value(), res_read);
         assert_eq!(
             reader.rest(),
             expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()

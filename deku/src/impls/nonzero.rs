@@ -67,23 +67,26 @@ mod tests {
     use hexlit::hex;
     use rstest::rstest;
 
-    use crate::reader::Reader;
+    use crate::{impls::test_common::ReadOutput, reader::Reader};
 
     use super::*;
     use bitvec::prelude::*;
 
-    #[rstest(input, expected,
-        case(&hex!("FF"), NonZeroU8::new(0xFF).unwrap()),
+    #[rstest]
+    #[case(hex!("FF"), ReadOutput::expected(NonZeroU8::new(0xFF).unwrap()))]
+    #[should_panic(expected = "Parse(\"NonZero assertion\")")]
+    #[case(hex!("00"), ReadOutput::should_panic())]
+    fn test_non_zero<const BITS: usize>(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] expected: ReadOutput<BITS, NonZeroU8>,
+    ) {
+        let input = input.as_ref();
 
-        #[should_panic(expected = "Parse(\"NonZero assertion\")")]
-        case(&hex!("00"), NonZeroU8::new(0xFF).unwrap()),
-    )]
-    fn test_non_zero(input: &[u8], expected: NonZeroU8) {
         let mut bit_slice = input.view_bits::<Msb0>();
 
         let mut reader = Reader::new(&mut bit_slice);
         let res_read = NonZeroU8::from_reader_with_ctx(&mut reader, ()).unwrap();
-        assert_eq!(expected, res_read);
+        assert_eq!(*expected.value(), res_read);
 
         let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();

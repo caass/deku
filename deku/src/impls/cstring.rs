@@ -61,7 +61,7 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = CString::from_reader_with_ctx(&mut reader, ()).unwrap();
-        assert_eq!(expected.value, res_read);
+        assert_eq!(*expected.value(), res_read);
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected.rest_bytes, buf);

@@ -354,7 +354,7 @@ mod tests {
                     .unwrap()
             }
         };
-        assert_eq!(expected.value, res_read);
+        assert_eq!(*expected.value(), res_read);
         assert_eq!(
             reader.rest(),
             expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()

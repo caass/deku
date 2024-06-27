@@ -144,7 +144,7 @@ mod tests {
             (ctx.limit, (ctx.endian, BitSize(bit_size))),
         )
         .unwrap();
-        assert_eq!(expected.value, actual_read);
+        assert_eq!(*expected.value(), actual_read);
         assert_eq!(
             reader.rest(),
             expected.rest_bits.iter().by_vals().collect::<Vec<bool>>()

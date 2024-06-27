@@ -68,7 +68,7 @@ mod tests {
         let mut input = input.as_ref();
         let mut reader = Reader::new(&mut input);
         let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();
-        assert_eq!(expected.value, res_read);
+        assert_eq!(*expected.value(), res_read);
     }
 
     #[test]

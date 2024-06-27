@@ -73,11 +73,16 @@ mod tests {
     use super::*;
     use crate::{ctx::Endian, reader::Reader};
 
-    #[rstest(input, endian, expected,
-        case::normal_le([237, 160, 254, 145].as_ref(), Endian::Little, Ipv4Addr::new(145, 254, 160, 237)),
-        case::normal_be([145, 254, 160, 237].as_ref(), Endian::Big, Ipv4Addr::new(145, 254, 160, 237)),
-    )]
-    fn test_ipv4(input: &[u8], endian: Endian, expected: Ipv4Addr) {
+    #[rstest]
+    #[case::normal_le([237, 160, 254, 145], Endian::Little, Ipv4Addr::new(145, 254, 160, 237))]
+    #[case::normal_be([145, 254, 160, 237], Endian::Big, Ipv4Addr::new(145, 254, 160, 237))]
+    fn test_ipv4(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] endian: Endian,
+        #[case] expected: Ipv4Addr,
+    ) {
+        let input = input.as_ref();
+
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = Ipv4Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
@@ -88,11 +93,24 @@ mod tests {
         assert_eq!(input.to_vec(), writer.inner);
     }
 
-    #[rstest(input, endian, expected,
-        case::normal_le([0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref(), Endian::Little, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff)),
-        case::normal_be([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xC0, 0x0A, 0x02, 0xFF].as_ref(), Endian::Big, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff)),
+    #[rstest]
+    #[case::normal_le(
+        [0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        Endian::Little,
+        Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff)
+        )]
+    #[case::normal_be(
+        [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xC0, 0x0A, 0x02, 0xFF],
+        Endian::Big,
+        Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff)
     )]
-    fn test_ipv6(input: &[u8], endian: Endian, expected: Ipv6Addr) {
+    fn test_ipv6(
+        #[case] input: impl AsRef<[u8]>,
+        #[case] endian: Endian,
+        #[case] expected: Ipv6Addr,
+    ) {
+        let input = input.as_ref();
+
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = Ipv6Addr::from_reader_with_ctx(&mut reader, endian).unwrap();

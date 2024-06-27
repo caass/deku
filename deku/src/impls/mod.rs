@@ -31,13 +31,27 @@ mod test_common {
 
     use crate::ctx::{Endian, Limit};
 
-    pub(super) struct Ctx<T, Predicate>
+    #[derive(Debug)]
+    pub(super) struct Ctx<T, Predicate = fn(&T) -> bool>
     where
         Predicate: FnMut(&T) -> bool,
     {
         pub(super) endian: Endian,
         pub(super) bit_size: Option<usize>,
         pub(super) limit: Limit<T, Predicate>,
+    }
+
+    impl<T, Predicate> Default for Ctx<T, Predicate>
+    where
+        Predicate: FnMut(&T) -> bool,
+    {
+        fn default() -> Self {
+            Self {
+                endian: Endian::default(),
+                bit_size: None,
+                limit: Limit::End,
+            }
+        }
     }
 
     impl<T, Predicate> Ctx<T, Predicate>
@@ -69,23 +83,10 @@ mod test_common {
         }
     }
 
-    impl<T, Predicate> Default for Ctx<T, Predicate>
-    where
-        Predicate: FnMut(&T) -> bool,
-    {
-        fn default() -> Self {
-            Self {
-                endian: Endian::default(),
-                bit_size: None,
-                limit: Limit::End,
-            }
-        }
-    }
-
     static DEFAULT_REST_BYTES: &[u8] = &[];
 
     pub(super) struct ReadOutput<'a, const BITS: usize, T> {
-        pub(super) value: T,
+        value: Option<T>,
         pub(super) rest_bits: BitArray<[u8; BITS], Msb0>,
         pub(super) rest_bytes: &'a [u8],
     }
@@ -93,23 +94,25 @@ mod test_common {
     impl<'a, T: Default> Default for ReadOutput<'a, 0, T> {
         fn default() -> Self {
             Self {
-                value: T::default(),
+                value: Some(T::default()),
                 rest_bits: bitarr![u8, Msb0;],
                 rest_bytes: DEFAULT_REST_BYTES,
             }
         }
     }
 
-    impl<'a, T: Default> ReadOutput<'a, 0, T> {
-        pub(super) fn should_panic() -> Self {
-            Self::default()
-        }
-    }
-
     impl<'a, T> ReadOutput<'a, 0, T> {
         pub(super) fn expected(value: impl Into<T>) -> Self {
             Self {
-                value: value.into(),
+                value: Some(value.into()),
+                rest_bits: bitarr![u8, Msb0;],
+                rest_bytes: DEFAULT_REST_BYTES,
+            }
+        }
+
+        pub(super) fn should_panic() -> Self {
+            Self {
+                value: None,
                 rest_bits: bitarr![u8, Msb0;],
                 rest_bytes: DEFAULT_REST_BYTES,
             }
@@ -131,6 +134,12 @@ mod test_common {
         pub(super) fn with_rest_bytes(mut self, rest_bytes: &'a [u8]) -> Self {
             self.rest_bytes = rest_bytes;
             self
+        }
+
+        pub(super) fn value(&self) -> &T {
+            self.value
+                .as_ref()
+                .expect("Attempted to read value when panic was expected")
         }
     }
 
